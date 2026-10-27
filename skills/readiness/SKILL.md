@@ -44,13 +44,19 @@ Computes a readiness score from overnight HRV, resting HR, sleep, training load 
 Append one JSON line to `~/.headroom/history.jsonl` on every run, including failed ones (create the folder if needed):
 
 ```json
-{"date":"2026-10-22","status":"ok","score":64,"band":"Moderate","source":"Headroom estimate","estimateScore":64,"runs7d":3,"recent":{"km7d":20.6,"longestKm28d":12.5},"yesterday":{"planned":7,"ranKm":12.5},"components":{"hrv":58,"rhr":70,"sleep":66,"load":60,"bodyBattery":72}}
+{"date":"2026-10-22","status":"ok","score":64,"band":"Moderate","source":"Headroom estimate","estimateScore":64,"runs7d":3,"recent":{"km7d":20.6,"longestKm28d":12.5},"yesterday":{"planned":7,"ranKm":12.5},"components":{"hrv":58,"rhr":70,"sleep":66,"load":60,"bodyBattery":72},"inputs":{"hrv":61,"hrvBaseline":64,"rhr":55,"rhrBaseline":54.2,"sleepScore":76,"sleepHours":6.1,"loadRatio":1.12,"hardDaysAgo":2,"bodyBattery":71}}
 {"date":"2026-10-23","status":"failed","reason":"Chrome site approval for connect.garmin.com timed out"}
 ```
+
+Copy `inputs` from the result unchanged: it holds the day's raw values, so later questions can be answered from this log instead of fetching Garmin again.
 
 Use the script's `status` (`no-sync`, `auth-expired`, `unreachable`, `calibrating`) when it returns one, and `failed` with a short `reason` when the run never got that far. For an email about a `failed` run, render it with `{"date":"...","status":"failed","message":"<reason in one plain sentence>"}` so the subject says what actually went wrong; never send a `no-sync` subject for a run that didn't read the data.
 
 When the user is present (not a scheduled run), ask once: "Did that match how you feel? 👍 / 👎". Append their answer as `{"date":"...","feedback":"up"}` or `"down"`. After 2-3 weeks, this log is what the weights get tuned against.
+
+## Questions about trends
+
+For questions like "why is my resting HR up?" or "how has my sleep been?", read `~/.headroom/history.jsonl` first. The `ok` lines hold each day's resting HR, HRV, sleep, Body Battery and load ratio with their baselines, plus `recent` and `yesterday` for running volume. Only fetch from Garmin when the log can't answer: dates before logging began, days the check failed, or details it doesn't keep, such as a single run's laps or form. Then make one small `javascript_tool` call for just the missing fields and dates, not a full morning check.
 
 ## Backtest
 
