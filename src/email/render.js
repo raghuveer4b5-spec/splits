@@ -122,7 +122,7 @@ function renderEmail(result, config = {}) {
     ? `${esc(result.source)}${result.estimateScore !== null && result.estimateScore !== undefined ? ` · Headroom estimate ${result.estimateScore}` : ''}`
     : 'Headroom estimate from your Garmin data';
   // The inbox preview line says who it's from, since self-sent mail shows up as "me".
-  const preheader = `Headroom morning check. ${limiters.length ? `${fromDevice ? 'Worth knowing' : 'Held back by'}: ${limiters[0]}.` : advice}`;
+  const preheader = `Headroom morning check. ${limiters.length ? `${fromDevice ? 'Worth knowing' : 'Lowering the score'}: ${limiters[0]}.` : advice}`;
 
   const hero = card(`<table role="presentation" cellpadding="0" cellspacing="0" width="100%"><tr>
 <td width="84" valign="middle"><table role="presentation" cellpadding="0" cellspacing="0"><tr><td width="72" height="72" align="center" valign="middle" bgcolor="${color}" style="width:72px;height:72px;border-radius:36px;background:${color};color:#FFFFFF;font-size:30px;font-weight:700;text-align:center">${result.score}</td></tr></table></td>
@@ -152,7 +152,7 @@ function renderEmail(result, config = {}) {
   const why = rows.length
     ? card(`${label('WHAT SHAPED THE SCORE')}<table role="presentation" width="100%" cellpadding="0" cellspacing="0">${bars}</table>
 <p style="margin:10px 0 0;font-size:12px;color:${MUTED}">Each scored 0-100 against your own 30-day normal. About 70 is a normal day.</p>${
-        limiters.length ? `<p style="margin:12px 0 0;font-size:14px;line-height:1.55;color:${INK}"><strong>${fromDevice ? 'Worth knowing' : 'Held back by'}:</strong> ${esc(limiters.join('; '))}</p>` : ''
+        limiters.length ? `<p style="margin:12px 0 0;font-size:14px;line-height:1.55;color:${INK}"><strong>${fromDevice ? 'Worth knowing' : 'Lowering the score'}:</strong> ${esc(limiters.join('; '))}</p>` : ''
       }`)
     : '';
 
@@ -188,7 +188,7 @@ function renderEmail(result, config = {}) {
     today && today.accessory ? today.accessory : '',
     today && result.yesterday && result.yesterday.note ? result.yesterday.note : '',
     rows.length ? `\nWhat shaped the score:\n${rows.map(([n, v, d]) => `- ${n}: ${v} (${d})`).join('\n')}` : '',
-    limiters.length ? `\n${fromDevice ? 'Worth knowing' : 'Held back by'}: ${limiters.join('; ')}` : '',
+    limiters.length ? `\n${fromDevice ? 'Worth knowing' : 'Lowering the score'}: ${limiters.join('; ')}` : '',
   ];
   return { subject, html, text: textLines.filter(Boolean).join('\n') };
 }

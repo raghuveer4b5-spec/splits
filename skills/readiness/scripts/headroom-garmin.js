@@ -329,7 +329,7 @@ const limiters = [
 ];
 const suggestion = SUGGESTIONS[band];
 const label = useDevice ? ` (${source})` : '';
-const message = `Readiness ${score} · ${band}${label}. ${suggestion}${limiters.length ? ` ${useDevice ? 'Worth knowing' : 'Held back by'}: ${limiters.join('; ')}.` : ''}`;
+const message = `Readiness ${score} · ${band}${label}. ${suggestion}${limiters.length ? ` ${useDevice ? 'Worth knowing' : 'Lowering the score'}: ${limiters.join('; ')}.` : ''}`;
 return { ...base, status: 'ok', score, band, source, estimateScore, limiters, suggestion, message };
 }
 function statusMessage(status) {

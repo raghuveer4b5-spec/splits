@@ -57,7 +57,7 @@ test('each band gets its own call to action, and the preview says it is from Hea
   assert.equal(at('Poor', 18), 'Rest day: recovery comes first · Readiness 18');
   const strengthDay = renderEmail({ ...RESULT, date: '2026-10-21', band: 'Moderate', score: 62 }, CONFIG).subject;
   assert.equal(strengthDay, 'Steady day: strength day · Readiness 62');
-  assert.match(renderEmail(RESULT, CONFIG).html, /Headroom morning check\. Held back by: short or poor sleep/);
+  assert.match(renderEmail(RESULT, CONFIG).html, /Headroom morning check\. Lowering the score: short or poor sleep/);
   assert.equal(renderEmail({ date: '2026-10-24', status: 'auth-expired', message: 'x' }, CONFIG).subject, 'No check today: sign in to Garmin Connect');
 });
 
