@@ -5,3 +5,7 @@ data/
 *.local.json
 .preview/
 .claude/
+*.fit
+*.FIT
+*.zip
+*.key

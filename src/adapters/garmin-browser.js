@@ -61,6 +61,17 @@ function wakeLevel(values, sleepEndGmt) {
   return Math.max(...points.map((p) => p[1]));
 }
 
+// One night's HRV summary in the shape the scoring code uses. Shared with garmin-api.js.
+function hrvFields(x) {
+  return {
+    hrvLastNight: x.lastNightAvg ?? null,
+    hrvWeeklyAvg: x.weeklyAvg ?? null,
+    hrvStatus: x.status ?? null,
+    hrvBalancedLow: x.baseline?.balancedLow ?? null,
+    hrvBalancedHigh: x.baseline?.balancedUpper ?? null,
+  };
+}
+
 // One Garmin activity in the shape the scoring code uses.
 function toActivity(a) {
   const zones = [1, 2, 3, 4, 5].map((i) => a[`hrTimeInZone_${i}`]);
@@ -99,15 +110,7 @@ async function fetchCommon({ startDate, endDate, sleepFrom }) {
 
   for (const [s, e] of ranges(startDate, endDate)) {
     const hrv = await safe(gget(`/hrv-service/hrv/daily/${s}/${e}`), 'hrv');
-    for (const x of hrv?.hrvSummaries || []) {
-      Object.assign(day(x.calendarDate), {
-        hrvLastNight: x.lastNightAvg ?? null,
-        hrvWeeklyAvg: x.weeklyAvg ?? null,
-        hrvStatus: x.status ?? null,
-        hrvBalancedLow: x.baseline?.balancedLow ?? null,
-        hrvBalancedHigh: x.baseline?.balancedUpper ?? null,
-      });
-    }
+    for (const x of hrv?.hrvSummaries || []) Object.assign(day(x.calendarDate), hrvFields(x));
     const rhr = await safe(gget(`/usersummary-service/stats/heartRate/daily/${s}/${e}`), 'rhr');
     for (const x of rhr || []) {
       if (typeof x.values?.restingHR === 'number') day(x.calendarDate).restingHr = x.values.restingHR;
@@ -169,4 +172,4 @@ async function fetchCommon({ startDate, endDate, sleepFrom }) {
   };
 }
 
-module.exports = { fetchCommon, wakeLevel, toActivity };
+module.exports = { fetchCommon, wakeLevel, toActivity, hrvFields, ranges, dateList };

@@ -55,11 +55,12 @@ const cfg = { ...(config || {}) };
 if (!cfg.maxHr) cfg.maxHr = observedMaxHr(activities) || ageMaxHr(cfg.age) || DEFAULT_CONFIG.maxHr;
 return cfg;
 }
-async function morningCheck({ date, config } = {}) {
+async function morningCheck({ date, config, fetchData = fetchCommon, raw = false } = {}) {
 const d = date || localToday();
-const data = await fetchCommon({ startDate: addDays(d, -31), endDate: d, sleepFrom: addDays(d, -2) });
-if (authExpired(data)) return JSON.stringify({ date: d, status: 'auth-expired', message: AUTH_MESSAGE });
-if (unreachable(data)) return JSON.stringify({ date: d, status: 'unreachable', message: UNREACHABLE_MESSAGE });
+const data = await fetchData({ startDate: addDays(d, -31), endDate: d, sleepFrom: addDays(d, -2) });
+const out = (o) => (raw ? o : paged(JSON.stringify(o)));
+if (authExpired(data)) return out({ date: d, status: 'auth-expired', message: AUTH_MESSAGE });
+if (unreachable(data)) return out({ date: d, status: 'unreachable', message: UNREACHABLE_MESSAGE });
 const cfg = resolveConfig(config, data.activities);
 const r = computeReadiness(data, d, cfg);
 const today = cfg.plan ? todaySession(cfg.plan, d, r.status === 'ok' ? r.band : null, cfg.maxHr, { limited: (r.limiters || []).length > 0 }) : null;
@@ -74,7 +75,7 @@ const yesterday = cfg.plan ? compareDay(cfg.plan, addDays(d, -1), km(runsWithin(
 const message = today ? `${headline} Today: ${today.suggestion}.${yesterday?.note ? ` ${yesterday.note}` : ''}` : r.message;
 const runs7d = runsWithin(1, 7).length;
 const recent = { km7d: round(km(runsWithin(1, 7)), 1), longestKm28d: round(runsWithin(1, 28).reduce((m, a) => Math.max(m, a.distanceM / 1000), 0), 1) };
-return paged(JSON.stringify({
+return out({
 date: r.date,
 status: r.status,
 score: r.score,
@@ -92,7 +93,7 @@ components: r.components,
 inputs: r.inputs,
 missing: r.missing,
 warnings: data.warnings.slice(0, 3),
-}));
+});
 }
 function dayFlag(activities, date, maxHr) {
 const todays = activities.filter((a) => a.start.startsWith(date));
@@ -115,11 +116,12 @@ rows.push(`${d.slice(5).replace('-', '')}:${score}${r.band ? r.band[0] : ''}${da
 const legend = 'MMDD:score, band H/M/L/P, then activity that day: h hard, r run, x other';
 return paged(`${legend}\n${rows.join(' ')}`);
 }
-async function profile({ days = 90 } = {}) {
+async function profile({ days = 90, fetchData = fetchCommon, raw = false } = {}) {
 const end = localToday();
-const data = await fetchCommon({ startDate: addDays(end, -(days - 1)), endDate: end, sleepFrom: end });
-if (authExpired(data)) return JSON.stringify({ status: 'auth-expired', message: AUTH_MESSAGE });
-if (unreachable(data)) return JSON.stringify({ status: 'unreachable', message: UNREACHABLE_MESSAGE });
+const data = await fetchData({ startDate: addDays(end, -(days - 1)), endDate: end, sleepFrom: end });
+const out = (o) => (raw ? o : JSON.stringify(o));
+if (authExpired(data)) return out({ status: 'auth-expired', message: AUTH_MESSAGE });
+if (unreachable(data)) return out({ status: 'unreachable', message: UNREACHABLE_MESSAGE });
 const withHrv = data.days.filter((d) => typeof d.hrvLastNight === 'number').length;
 const recent = data.activities.filter((a) => daysBetween(a.start.slice(0, 10), end) < 28);
 const recentRuns = recent.filter((a) => a.type.includes('running'));
@@ -139,7 +141,7 @@ const best = data.activities
 .sort((x, y) => x - y)[0];
 if (best) estimates[goal] = formatTime(best);
 }
-return JSON.stringify({
+return out({
 status: 'ok',
 estimatedTimes: estimates,
 weeklyRunKm4w: round(runKm / 4, 1),
@@ -904,6 +906,15 @@ if (after) return after[1];
 }
 return Math.max(...points.map((p) => p[1]));
 }
+function hrvFields(x) {
+return {
+hrvLastNight: x.lastNightAvg ?? null,
+hrvWeeklyAvg: x.weeklyAvg ?? null,
+hrvStatus: x.status ?? null,
+hrvBalancedLow: x.baseline?.balancedLow ?? null,
+hrvBalancedHigh: x.baseline?.balancedUpper ?? null,
+};
+}
 function toActivity(a) {
 const zones = [1, 2, 3, 4, 5].map((i) => a[`hrTimeInZone_${i}`]);
 const edited = a.elapsedDuration && a.duration > a.elapsedDuration + 60;
@@ -935,15 +946,7 @@ const profile = await safe(gget('/userprofile-service/socialProfile'), 'profile'
 if (!profile && /(timed out|network error)$/.test(warnings[0] || '')) return { days: [], activities: [], warnings };
 for (const [s, e] of ranges(startDate, endDate)) {
 const hrv = await safe(gget(`/hrv-service/hrv/daily/${s}/${e}`), 'hrv');
-for (const x of hrv?.hrvSummaries || []) {
-Object.assign(day(x.calendarDate), {
-hrvLastNight: x.lastNightAvg ?? null,
-hrvWeeklyAvg: x.weeklyAvg ?? null,
-hrvStatus: x.status ?? null,
-hrvBalancedLow: x.baseline?.balancedLow ?? null,
-hrvBalancedHigh: x.baseline?.balancedUpper ?? null,
-});
-}
+for (const x of hrv?.hrvSummaries || []) Object.assign(day(x.calendarDate), hrvFields(x));
 const rhr = await safe(gget(`/usersummary-service/stats/heartRate/daily/${s}/${e}`), 'rhr');
 for (const x of rhr || []) {
 if (typeof x.values?.restingHR === 'number') day(x.calendarDate).restingHr = x.values.restingHR;
@@ -997,7 +1000,7 @@ activities,
 warnings,
 };
 }
-module.exports = { fetchCommon, wakeLevel, toActivity };
+module.exports = { fetchCommon, wakeLevel, toActivity, hrvFields, ranges, dateList };
 }
 };
 const cache = {};

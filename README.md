@@ -60,20 +60,40 @@ Set up once, and Headroom picks your starting stage from how long you can run to
 
 ## Get started
 
-You'll need Claude (the desktop app or Claude Code) with Claude in Chrome and Gmail connected, and a Garmin watch.
+You'll need Claude (the desktop app or Claude Code) with Gmail connected, Node.js 18 or later, and a Garmin watch.
+
+**1. Install the plugin.**
 
 ```bash
 claude plugin marketplace add raghuveer4b5-spec/headroom
 claude plugin install headroom@headroom
 ```
 
-Then ask Claude: **"Set up Headroom."**
+**2. Create your Garmin API key.** Headroom reads your data through Garmin's official [Personal API](https://developer.garmin.com/gc-developer-program/personal/personal-api/), with a key only you hold.
+
+1. Sign in to Garmin Connect on the web and open [Personal API Key](https://connect.garmin.com/app/settings/personalApiToken).
+2. Select **Create Key**, accept the terms and pick an expiry. One year means the fewest renewals; Garmin emails you a week before it runs out.
+3. Copy the key. Garmin shows it only once.
+
+**3. Save the key on your computer.** On a Mac, with the key still copied, run this in Terminal:
+
+```bash
+mkdir -p ~/.headroom && pbpaste > ~/.headroom/garmin.key && chmod 600 ~/.headroom/garmin.key && echo Saved
+```
+
+On Linux or Windows, save the key as the only line of `~/.headroom/garmin.key` in a text editor.
+
+Treat the key like a password. Don't paste it into a chat with Claude or anyone else: the file is all Headroom needs. If it ever leaks, delete it on the same Garmin page and create a new one.
+
+**4. Ask Claude: "Set up Headroom."**
 
 The morning check runs on your computer, so pick a time it's usually on. The first scheduled run may ask for permission; click **Run now** once to approve it.
 
+No key? Headroom can also read Garmin Connect through your signed-in Chrome with [Claude in Chrome](https://claude.com/chrome). It's slower, uses more of your Claude usage, and needs Chrome open each morning.
+
 ## Privacy
 
-There's no Headroom server. Your Garmin data goes from Garmin to your browser to your own Claude session, emails go only to the address you choose, and your settings and history stay in `~/.headroom/` on your computer.
+There's no Headroom server. Your Garmin data goes from Garmin straight to your own computer and your own Claude session. Emails go only to the address you choose. Your key, settings and history stay in `~/.headroom/` on your computer. Activity files are read in memory and never saved, and your GPS track never leaves them.
 
 ---
 

@@ -20,8 +20,10 @@ flowchart TD
     W --> X[Build next week's plan<br/>around your strength days]
     X --> Y[Email the weekly plan]
     B --> C[Every morning]
-    C --> D[Claude opens Garmin Connect<br/>in your signed-in Chrome]
-    D --> E[Page script reads HRV, resting HR,<br/>sleep, Body Battery, activities]
+    C --> D[tools/check.js reads Garmin's Personal API<br/>with your key from ~/.headroom/garmin.key]
+    D -- no key or API down --> D2[Fallback: Claude opens Garmin Connect<br/>in your signed-in Chrome]
+    D --> E[HRV, resting HR, sleep,<br/>Body Battery, activities]
+    D2 --> E
     E --> F{Watch has its own<br/>readiness score?}
     F -- yes --> G[Use Garmin Training Readiness]
     F -- no --> H[Calculate the Headroom estimate]
@@ -31,7 +33,19 @@ flowchart TD
     K --> L[Log to ~/.headroom/history.jsonl]
 ```
 
-The Sunday email needs only your config, so it arrives even if your Garmin session has expired. Every number, in both emails, comes from tested code. Claude runs it and sends the result exactly as rendered.
+The Sunday email needs only your config, so it arrives even if your Garmin key or session has expired. Every number, in both emails, comes from tested code. Claude runs it and sends the result exactly as rendered.
+
+## Your Garmin key
+
+Garmin's [Personal API](https://developer.garmin.com/gc-developer-program/personal/personal-faq/) lets you read your own Garmin Connect data with a key you create at [Personal API Key](https://connect.garmin.com/app/settings/personalApiToken). Headroom keeps it in `~/.headroom/garmin.key`, readable only by you, and swaps it for a 24-hour access token on each run. The key never goes into your config, your history, an email or the chat.
+
+Keys expire after 30 days to a year, whichever you chose, and Garmin emails you a week before. When it runs out, the morning check falls back to Chrome if it can, and tells you to save a new key. Delete a key on the same Garmin page if it ever leaks.
+
+## One run in detail
+
+Ask Claude about a single run ("how were my splits?", "was that a cadence lock?") and Headroom reads that activity's FIT file, the watch's own per-second recording, in memory. It cuts the run into kilometres from the per-second data rather than the watch laps, which follow a workout's steps even when you didn't. Each km gets pace, grade-adjusted pace, heart rate, cadence, ground contact time, vertical oscillation and ratio, step length and power.
+
+It also reads values the activity summary leaves out: VO2max for that run, training effect, the RPE and feel you logged on the watch, sweat loss, temperature, Body Battery during the run, and the heart-rate zones the watch used. VO2max, sweat loss, grade-adjusted pace and Body Battery sit in FIT fields Garmin doesn't document; each was checked against what Garmin Connect shows before Headroom used it. GPS positions are skipped, and the file is never saved.
 
 ## The plan
 
@@ -89,13 +103,15 @@ Resting HR 7+ bpm above normal, or an HRV status of Low, caps the score at 30. W
 ```
 skills/setup               questionnaire → config, plan preview, schedule
 skills/readiness           morning check, backtest, weekly plan email
-src/adapters/              Garmin (browser session) → common data format
+src/adapters/garmin-api.js Garmin Personal API (your key) → common data format; activity downloads
+src/adapters/garmin-browser.js  Garmin (browser session) → common data format
+src/adapters/fit.js        FIT decoder and single-run summary (splits, form, HR check)
 src/core/readiness.js      the score
 src/core/plan.js           weekly plan + today's session
 src/core/pace.js           training paces from a race time (VDOT)
 src/core/beginner.js       run/walk stages and Sunday progression
 src/email/                 the morning and Sunday emails (email-safe HTML + plain text)
-tools/                     build, score, plan, email, weekly, preview
+tools/                     check, run, build, score, plan, email, weekly, preview
 ```
 
 The core never talks to Garmin directly. Adapters turn each source into one common format, so adding Fitbit or Pixel Watch (through the Google Health API) means writing an adapter, not touching the score or the plan:
@@ -121,7 +137,10 @@ Every field except `date` and `start` is optional.
 
 ```bash
 npm test                                  # synthetic data only
-npm run build                             # bundle src/ into the page script
+node tools/check.js                       # morning check through the Personal API
+node tools/check.js --profile             # what setup pre-fills from your history
+node tools/run.js [activityId | date]     # one run in detail, from its FIT file
+npm run build                             # bundle src/ into the Chrome page script
 node tools/score.js data.json --backtest 30
 node tools/plan.js                        # this week's plan from your config
 node tools/email.js result.json           # render a morning email
@@ -130,13 +149,13 @@ node tools/weekly.js                      # render next week's plan email
 
 ## Known limits
 
-- **Unofficial endpoints.** The Garmin adapter reads the same internal endpoints the Garmin Connect website uses. They can change without notice, and automated access sits outside Garmin's official API. Headroom is read-only and limited to your own account.
-- **Cost per check.** Each morning check pastes a ~29 KB script into the page, which uses some of your Claude usage. An MCP server or Garmin's official API would remove that.
-- **Untested on watches with Training Readiness.** Using Garmin's own score is written defensively but hasn't yet run against a watch that has it.
+- **The Chrome fallback uses unofficial endpoints.** Without a key, Headroom reads the same internal endpoints the Garmin Connect website uses. They can change without notice, and automated access sits outside Garmin's official API. Each check also pastes a ~44 KB script into the page, which uses more of your Claude usage. Headroom is read-only and limited to your own account either way.
+- **No Garmin Training Readiness through the API.** Garmin's Personal API doesn't include it, so on the API path the score is always the Headroom estimate. Only the Chrome path can use Garmin's own score, and that's written defensively but hasn't yet run against a watch that has it.
+- **Undocumented FIT fields.** VO2max, sweat loss, grade-adjusted pace and Body Battery in activity files were matched against Garmin Connect for a Forerunner 165. Other watches may store them differently; anything that doesn't decode comes back empty rather than wrong.
 - **The weights aren't validated.** They were checked against one runner's 60-day history, where personal bests fell on high-scoring days and the worst mornings scored lowest. That's encouraging, not proof.
 
 ## Roadmap
 
-- Post-run debrief: splits, pacing and form compared with your past runs at the same pace
+- Post-run debrief: today's single-run detail compared with your past runs at the same pace
 - Google Health API adapter for Fitbit and Pixel Watch
 - Tuning the weights from your 👍/👎 feedback

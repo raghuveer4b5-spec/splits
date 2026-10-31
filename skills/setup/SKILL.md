@@ -7,18 +7,36 @@ description: Setup questionnaire for Headroom. Checks the user's Garmin data, as
 
 Two short rounds of questions, then a saved config, a weekly plan, a scheduled morning check, and one test run. Re-running setup updates the existing config and schedule instead of adding a second one; keep answers the user doesn't change.
 
+## 0. The Garmin API key
+
+Headroom reads Garmin through the official Personal API with the user's own key, saved in `~/.headroom/garmin.key`. Check it exists without reading it: `test -s ~/.headroom/garmin.key && echo yes || echo no`.
+
+If there's no key, walk the user through it:
+
+1. In Garmin Connect on the web, open https://connect.garmin.com/app/settings/personalApiToken, select **Create Key**, accept the terms and pick an expiry (one year means the fewest renewals). Garmin shows the key once, so copy it.
+2. Save it. On a Mac, with the key still copied, they run this in their own terminal (Terminal, or a terminal tab beside this chat; a `!` command typed into the chat box can't read input):
+   `mkdir -p ~/.headroom && pbpaste > ~/.headroom/garmin.key && chmod 600 ~/.headroom/garmin.key && echo Saved`
+   Elsewhere: save it as the only line of `~/.headroom/garmin.key` in a text editor.
+3. Check it again with the `test -s` command above.
+
+Never ask for the key in chat, and never print, read or echo the file. If the user pastes a key into the chat anyway, don't use or repeat it: tell them it's now in the chat transcript, and ask them to delete that key on the same Garmin page and save a new one.
+
+If the user doesn't want a key, Headroom works through Claude in Chrome instead (step 1, Chrome path).
+
 ## 1. Check the data
 
-Follow steps 1-3 of the morning check in the `headroom:readiness` skill (fresh Chrome tab on `https://connect.garmin.com/app/home`, user signed in). Then run one `javascript_tool` call with the full contents of `../readiness/scripts/headroom-garmin.js` (relative to this skill's directory), a new line, and `Headroom.start('profile')`, then collect it with `Headroom.result()` as in step 5 of the morning check. Keep the tab open for the test run in step 6.
+**With a key:** from the plugin root (two levels up from this skill's directory), run `node tools/check.js --profile`. If it returns `key-invalid`, the key was mistyped, deleted or has expired: go back to step 0.
 
-It returns `estimatedTimes` (current 5K, 10K and half-marathon times estimated from the best recent run), `weeklyRunKm4w` (average running km per week, last 4 weeks), `longestRunKm4w`, `usualLiftDays` (weekdays with 2+ strength sessions in the last 4 weeks), `observedMaxHr`, `daysWithHrv` and `readyToScore`. If `readyToScore` is false, tell the user the score needs about 14 nights of HRV data from wearing the watch overnight; setup can continue now.
+**Chrome path:** follow steps 1-3 of the morning check's Chrome path in the `headroom:readiness` skill (fresh Chrome tab on `https://connect.garmin.com/app/home`, user signed in). Then run one `javascript_tool` call with the full contents of `../readiness/scripts/headroom-garmin.js` (relative to this skill's directory), a new line, and `Headroom.start('profile')`, then collect it with `Headroom.result()` as in step 5 of the morning check. Keep the tab open for the test run in step 6.
+
+Either way, it returns `estimatedTimes` (current 5K, 10K and half-marathon times estimated from the best recent run), `weeklyRunKm4w` (average running km per week, last 4 weeks), `longestRunKm4w`, `usualLiftDays` (weekdays with 2+ strength sessions in the last 4 weeks), `observedMaxHr`, `daysWithHrv` and `readyToScore`. If `readyToScore` is false, tell the user the score needs about 14 nights of HRV data from wearing the watch overnight; setup can continue now.
 
 ## 2. Ask the questions
 
 Use AskUserQuestion when available (up to 4 questions per call). Pre-fill from the profile where you can.
 
 **Round 1: the morning check**
-1. **Time.** 06:30, 07:00, 07:30, 08:00. It needs the computer awake with Chrome open, and the watch synced through the phone.
+1. **Time.** 06:30, 07:00, 07:30, 08:00. It needs the computer awake (with Chrome open on the Chrome path), and the watch synced through the phone.
 2. **Notifications.** Every morning (recommended); only on Low or Poor days; no notifications, just the log.
 3. **Delivery.** Email (recommended: the most reliable, since scheduled runs can't always push to a phone), push notification, or both. For email, confirm the address to send to; only ever use an address the user gives or confirms here.
 4. **Max heart rate.** Offer "{observedMaxHr} bpm, the highest in your last 90 days" (when there is one), "I don't know: estimate it from my age", and Other for a tested or Garmin-set value. If they don't know, ask their age (Other, a number) and use `208 - 0.7 x age`, rounded (Tanaka et al., 2001: the least biased of the common formulas, typically within about 10 bpm). Recommend the higher of the observed and age values: an observed max is a floor, since easy running rarely reaches it. If the observed value is more than 15 bpm above the age estimate, mention it may be a wrist-sensor spike and ask which to use.
@@ -80,7 +98,7 @@ Write `~/.headroom/config.json` (create the folder if needed):
 
 ## 4. Show the plan
 
-In the same tab, run `Headroom.planWeek({ config: <the config object> })` and show the week to the user as a short table (day, run, strength). Mention any `note:` lines. Ask if they want to change anything before scheduling.
+Run `node tools/plan.js` from the plugin root (or, on the Chrome path, `Headroom.planWeek({ config: <the config object> })` in the same tab) and show the week to the user as a short table (day, run, strength). Mention any `note:` lines. Ask if they want to change anything before scheduling.
 
 ## 5. Schedule the morning check
 
@@ -94,7 +112,7 @@ If the user chose email delivery and has a plan, also create (or update) a weekl
 
 If no scheduling tool is available, say so, and tell the user they can ask Claude for "my readiness" each morning instead.
 
-Scheduled runs are unattended, so any permission prompt stops them. Tell the user to open the task and click **Run now** once while at the computer, and to choose "always allow" for connect.garmin.com in Claude in Chrome. Push notifications only reach their phone while Remote Control is on.
+Scheduled runs are unattended, so any permission prompt stops them. Tell the user to open the task and click **Run now** once while at the computer, and to allow `node tools/check.js` when asked (and, on the Chrome path, "always allow" for connect.garmin.com in Claude in Chrome). Push notifications only reach their phone while Remote Control is on.
 
 ## 6. Test run
 
